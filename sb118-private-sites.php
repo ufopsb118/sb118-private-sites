@@ -6,7 +6,7 @@
  *                    Blocks REST API, RSS/Atom feeds, and direct page access for users not added to
  *                    the specific sub-site. Network super admins always have access.
  *                    Replaces jonradio-private-site with a single must-use plugin.
- * Version:           1.2.0
+ * Version:           1.3.0
  * Author:            StarBase 118
  * Author URI:        https://www.starbase118.net
  * License:           GPL-2.0-or-later
@@ -92,7 +92,18 @@ function sb118_block_private_feeds() {
 }
 
 /**
- * Redirect unauthenticated users to the login page on private sites.
+ * Gate direct page access on private sites.
+ *
+ * Two different failures need two different answers. Sending a logged-out visitor to the
+ * login page is correct. Sending an *already authenticated* user there is not: wp-login.php
+ * sees their valid auth cookie, wp_signon() succeeds, and it redirects them straight back to
+ * the page they came from, which redirects them to login again. That loop runs until nginx's
+ * per-IP login rate limit trips and serves a 503, so the member sees a server error rather
+ * than an explanation.
+ *
+ * A user who is signed in but not a member of this sub-site is not going to become one by
+ * logging in again, so tell them that instead of bouncing them.
+ *
  * Allows wp-login.php, wp-cron.php, and admin-ajax.php through.
  */
 add_action( 'template_redirect', function () {
@@ -109,6 +120,15 @@ add_action( 'template_redirect', function () {
 	$allowed = array( 'wp-login.php', 'wp-cron.php', 'admin-ajax.php', 'wp-activate.php' );
 	if ( in_array( $script, $allowed, true ) ) {
 		return;
+	}
+
+	// Signed in, but not a member of this sub-site. Logging in again cannot fix that.
+	if ( is_user_logged_in() ) {
+		wp_die(
+			__( 'This site is private, and your account does not have access to it. If you think it should, contact the site\'s staff team.', 'sb118-private-sites' ),
+			__( 'Private Site', 'sb118-private-sites' ),
+			array( 'response' => 403 )
+		);
 	}
 
 	$redirect_to = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
