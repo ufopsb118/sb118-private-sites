@@ -29,7 +29,7 @@ sub-site**:
 | --- | --- |
 | REST API (`/wp-json/*`) | `401 Unauthorized` |
 | RSS / Atom feeds (`/feed/`, `/feed/atom/`, …) | `403 Forbidden` |
-| Direct page access | `302` redirect to `wp-login.php` |
+| Direct page access | Logged-out users go to `wp-login.php`; signed-in non-members get a `403` with their account identity and a nonce-protected sign-out link |
 | Feed `<link>` tags in `<head>` | removed |
 
 **Access rule:** logged in **and** a member of the current sub-site. Network **super admins
@@ -59,6 +59,12 @@ The whole plugin is a handful of WordPress hooks (`rest_authentication_errors`, 
 actions, `template_redirect`, and `wp`). Each one first checks `blog_public`, then checks
 membership via core's `is_user_member_of_blog()`. No database tables, no options, no admin UI.
 Read [`sb118-private-sites.php`](sb118-private-sites.php) — it's short.
+
+## Checks
+
+```bash
+php -d zend.assertions=1 -d assert.exception=1 tests/denial-message.php
+```
 
 ## License
 
